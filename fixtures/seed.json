@@ -1,0 +1,28 @@
+[
+  {
+    "model": "core.department",
+    "pk": 1,
+    "fields": { "name": "Информатика" }
+  },
+  {
+    "model": "core.groupmodel",
+    "pk": 1,
+    "fields": { "name": "ИВТ-31", "department": 1, "year": 3 }
+  },
+  {
+    "model": "core.discipline",
+    "pk": 1,
+    "fields": { "name": "Базы данных" }
+  },
+  {
+    "model": "core.room",
+    "pk": 1,
+    "fields": { "name": "А-101", "capacity": 40, "room_type": "lecture" }
+  },
+  {
+    "model": "core.room",
+    "pk": 2,
+    "fields": { "name": "Л-202", "capacity": 20, "room_type": "lab" }
+  }
+]
+
