@@ -1,0 +1,20 @@
+# BACKUP: PostgreSQL Database Settings
+# Эта конфигурация была сохранена для восстановления после проверки с WAMP Server
+# Дата: автоматическое сохранение
+# 
+# ВАЖНО: Сейчас используется MySQL (для работы с WAMP Server и поддержки JSONField)
+# PostgreSQL будет восстановлен когда вы запустите RESTORE_POSTGRES.py или восстановите вручную
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("POSTGRES_DB", "schedule_db"),
+        "USER": os.getenv("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
+        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+        "PORT": int(os.getenv("POSTGRES_PORT", "5432")),
+    }
+}
+
+# Для восстановления нужно заменить блок DATABASES (строки 63-72) в settings.py на этот код
+

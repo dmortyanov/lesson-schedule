@@ -8,7 +8,10 @@ urlpatterns = [
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/", include("core.urls")),
-    # homepage with simple UI
-    path("", TemplateView.as_view(template_name="index.html"), name="index"),
+    # Frontend pages
+    path("", TemplateView.as_view(template_name="login.html"), name="login"),
+    path("dashboard/", TemplateView.as_view(template_name="dashboard.html"), name="dashboard"),
+    # Legacy API demo page
+    path("api-demo/", TemplateView.as_view(template_name="index.html"), name="api_demo"),
 ]
 

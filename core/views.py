@@ -4,6 +4,7 @@ from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 
 from .models import Department, GroupModel, Teacher, Student, Discipline, Room, Lesson
 from .serializers import (
@@ -14,6 +15,7 @@ from .serializers import (
     DisciplineSerializer,
     RoomSerializer,
     LessonSerializer,
+    UserRegistrationSerializer,
 )
 from .permissions import LessonPermission
 
@@ -121,3 +123,59 @@ class LessonViewSet(viewsets.ModelViewSet):
         ser = self.get_serializer(qs, many=True)
         return Response(ser.data)
 
+
+class CurrentUserView(APIView):
+    """Получить информацию о текущем пользователе"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        groups = list(user.groups.values_list('name', flat=True))
+        
+        # Определяем роль
+        role = 'STUDENT'
+        if 'ADMIN_DB' in groups:
+            role = 'ADMIN_DB'
+        elif 'TEACHER' in groups:
+            role = 'TEACHER'
+        
+        # Получаем связанные данные
+        teacher = None
+        student = None
+        
+        try:
+            teacher = Teacher.objects.get(user=user)
+        except Teacher.DoesNotExist:
+            pass
+        
+        try:
+            student = Student.objects.get(user=user)
+        except Student.DoesNotExist:
+            pass
+
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'groups': groups,
+            'role': role,
+            'teacher_id': teacher.id if teacher else None,
+            'student_id': student.id if student else None,
+        })
+
+
+class RegisterView(APIView):
+    """Регистрация нового пользователя"""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                'message': 'Пользователь успешно зарегистрирован',
+                'username': user.username,
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

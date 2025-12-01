@@ -1,0 +1,11 @@
+# Для использования PyMySQL вместо mysqlclient
+# Скопируйте этот код в файл schedule/__init__.py
+# Или переименуйте этот файл в __init__.py после установки PyMySQL
+
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    # Если PyMySQL не установлен, используется mysqlclient
+    pass
+

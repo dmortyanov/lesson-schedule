@@ -1,9 +1,14 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
 
-load_dotenv()
+# Загрузка переменных окружения из .env файла (опционально)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Если python-dotenv не установлен, используем переменные окружения напрямую
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -55,14 +60,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "schedule.wsgi.application"
 
+# ВРЕМЕННАЯ КОНФИГУРАЦИЯ: Используется MySQL для работы с WAMP Server
+# ОРИГИНАЛЬНЫЕ НАСТРОЙКИ POSTGRESQL СОХРАНЕНЫ В: POSTGRES_SETTINGS_BACKUP.txt
+# Для восстановления PostgreSQL - см. инструкцию в файле POSTGRES_SETTINGS_BACKUP.txt
+# Примечание: MySQL выбран вместо SQLite, так как проект использует JSONField
+
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "schedule_db"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": int(os.getenv("POSTGRES_PORT", "5432")),
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("MYSQL_DB", "schedule_db"),
+        "USER": os.getenv("MYSQL_USER", "root"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "123"),
+        "HOST": os.getenv("MYSQL_HOST", "localhost"),
+        "PORT": os.getenv("MYSQL_PORT", "3307"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES', character_set_connection=utf8mb4, collation_connection=utf8mb4_unicode_ci",
+        },
     }
 }
 
@@ -80,6 +94,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход - ИС Расписание</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <h1>ИС «Расписание занятий»</h1>
+      
+      <!-- Переключатель между входом и регистрацией -->
+      <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0;">
+        <button type="button" id="loginTab" class="tab-button active" onclick="switchToLogin()" style="flex: 1; padding: 10px; border: none; background: none; cursor: pointer; border-bottom: 2px solid #007bff;">
+          Вход
+        </button>
+        <button type="button" id="registerTab" class="tab-button" onclick="switchToRegister()" style="flex: 1; padding: 10px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
+          Регистрация
+        </button>
+      </div>
+
+      <!-- Форма входа -->
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="username">Логин</label>
+          <input type="text" id="username" name="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password">Пароль</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div id="loginError" class="alert alert-error hidden"></div>
+        <button type="submit" class="btn" style="width: 100%;">Войти</button>
+      </form>
+
+      <!-- Форма регистрации -->
+      <form id="registerForm" onsubmit="handleRegister(event)" style="display: none;">
+        <div class="form-group">
+          <label for="reg-username">Логин</label>
+          <input type="text" id="reg-username" name="username" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Пароль (минимум 8 символов)</label>
+          <input type="password" id="reg-password" name="password" required minlength="8">
+        </div>
+        <div class="form-group">
+          <label for="reg-password-confirm">Подтвердите пароль</label>
+          <input type="password" id="reg-password-confirm" name="password_confirm" required minlength="8">
+        </div>
+        <div class="form-group">
+          <label for="reg-first-name">Имя</label>
+          <input type="text" id="reg-first-name" name="first_name">
+        </div>
+        <div class="form-group">
+          <label for="reg-last-name">Фамилия</label>
+          <input type="text" id="reg-last-name" name="last_name">
+        </div>
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input type="email" id="reg-email" name="email">
+        </div>
+        <div id="registerError" class="alert alert-error hidden"></div>
+        <div id="registerSuccess" class="alert alert-success hidden"></div>
+        <button type="submit" class="btn" style="width: 100%;">Зарегистрироваться</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="{% static 'js/api.js' %}"></script>
+  <script src="{% static 'js/auth.js' %}"></script>
+  <script>
+    // Переключение между формой входа и регистрации
+    function switchToLogin() {
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('loginTab').classList.add('active');
+      document.getElementById('loginTab').style.borderBottomColor = '#007bff';
+      document.getElementById('registerTab').classList.remove('active');
+      document.getElementById('registerTab').style.borderBottomColor = 'transparent';
+      document.getElementById('registerError').classList.add('hidden');
+      document.getElementById('registerSuccess').classList.add('hidden');
+    }
+
+    function switchToRegister() {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('registerForm').style.display = 'block';
+      document.getElementById('registerTab').classList.add('active');
+      document.getElementById('registerTab').style.borderBottomColor = '#007bff';
+      document.getElementById('loginTab').classList.remove('active');
+      document.getElementById('loginTab').style.borderBottomColor = 'transparent';
+      document.getElementById('loginError').classList.add('hidden');
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      const errorDiv = document.getElementById('loginError');
+      errorDiv.classList.add('hidden');
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Вход...';
+      
+      try {
+        await api.login(username, password);
+        // После успешного входа определяем роль и перенаправляем
+        const role = await auth.detectRole();
+        auth.setUserRole(role);
+        window.location.href = '/dashboard/';
+      } catch (error) {
+        errorDiv.textContent = error.message || 'Ошибка входа. Проверьте логин и пароль.';
+        errorDiv.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Войти';
+      }
+    }
+
+    async function handleRegister(event) {
+      event.preventDefault();
+      const errorDiv = document.getElementById('registerError');
+      const successDiv = document.getElementById('registerSuccess');
+      errorDiv.classList.add('hidden');
+      successDiv.classList.add('hidden');
+      
+      const password = document.getElementById('reg-password').value;
+      const passwordConfirm = document.getElementById('reg-password-confirm').value;
+      
+      // Проверка совпадения паролей на клиенте
+      if (password !== passwordConfirm) {
+        errorDiv.textContent = 'Пароли не совпадают';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      
+      const userData = {
+        username: document.getElementById('reg-username').value,
+        password: password,
+        password_confirm: passwordConfirm,
+        first_name: document.getElementById('reg-first-name').value || '',
+        last_name: document.getElementById('reg-last-name').value || '',
+        email: document.getElementById('reg-email').value || '',
+      };
+      
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Регистрация...';
+      
+      try {
+        await api.register(userData);
+        successDiv.textContent = 'Регистрация успешна! Теперь войдите в систему.';
+        successDiv.classList.remove('hidden');
+        
+        // Через 2 секунды переключаемся на форму входа
+        setTimeout(() => {
+          switchToLogin();
+          document.getElementById('username').value = userData.username;
+          document.getElementById('username').focus();
+        }, 2000);
+      } catch (error) {
+        // Обработка ошибок валидации
+        let errorMessage = error.message || 'Ошибка регистрации. Попробуйте снова.';
+        
+        // Если ошибка содержит объект с полями, форматируем их
+        if (typeof error.message === 'object') {
+          const errors = Object.values(error.message).flat();
+          errorMessage = errors.join(', ');
+        }
+        
+        errorDiv.textContent = errorMessage;
+        errorDiv.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Зарегистрироваться';
+      }
+    }
+
+    // Сначала проверяем параметр expired - если есть, очищаем токены и не проверяем авторизацию
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('expired') === 'true') {
+      api.clearTokens();
+      localStorage.removeItem('userRole');
+      // Удаляем параметр из URL, чтобы он не мешал при последующих загрузках
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (auth.checkAuth()) {
+      // Проверяем валидность токена только если нет параметра expired
+      api.getCurrentUser()
+        .then(() => {
+          // Если токен валиден, перенаправляем на dashboard
+          window.location.href = '/dashboard/';
+        })
+        .catch(() => {
+          // Если токен невалиден (например, истек), очищаем его и остаёмся на странице логина
+          api.clearTokens();
+          localStorage.removeItem('userRole');
+          // НЕ перенаправляем - остаёмся на странице логина, чтобы пользователь мог войти заново
+        });
+    }
+  </script>
+</body>
+</html>
+

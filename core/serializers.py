@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from .models import Department, GroupModel, Teacher, Student, Discipline, Room, Lesson
 
@@ -22,6 +22,34 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "first_name", "last_name", "email"]
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ["username", "password", "password_confirm", "first_name", "last_name", "email"]
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError({"password": "Пароли не совпадают"})
+        return data
+
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            email=validated_data.get('email', ''),
+        )
+        # Автоматически добавляем в группу STUDENT
+        student_group, _ = Group.objects.get_or_create(name='STUDENT')
+        user.groups.add(student_group)
+        return user
 
 
 class TeacherSerializer(serializers.ModelSerializer):
