@@ -112,4 +112,3 @@ class LessonSerializer(serializers.ModelSerializer):
             "end_time",
             "week",
         ]
-

@@ -289,6 +289,16 @@ class ApiClient {
   async deleteLesson(id) {
     return this.request(`/lessons/${id}/`, { method: 'DELETE' });
   }
+
+  // Получить дисциплины преподавателя
+  async getTeacherDisciplines() {
+    return this.request('/teacher/disciplines/');
+  }
+
+  // Получить группы кафедры преподавателя
+  async getTeacherGroups() {
+    return this.request('/teacher/groups/');
+  }
 }
 
 // Глобальный экземпляр API клиента

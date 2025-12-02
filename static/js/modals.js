@@ -69,12 +69,34 @@ async function showAddLessonModal() {
 async function editLesson(id) {
   try {
     const lesson = await api.request(`/lessons/${id}/`);
-    const [groups, teachers, disciplines, rooms] = await Promise.all([
-      api.getGroups(),
-      api.getTeachers(),
-      api.getDisciplines(),
-      api.getRooms(),
-    ]);
+    const userInfo = await api.getCurrentUser();
+    
+    // Для преподавателя используем ограниченные данные
+    let groups, disciplines, rooms;
+    
+    if (userInfo.role === 'TEACHER') {
+      const [teacherGroups, teacherDisciplines, allRooms] = await Promise.all([
+        api.getTeacherGroups().catch(() => ({ groups: [] })),
+        api.getTeacherDisciplines().catch(() => ({ disciplines: [] })),
+        api.getRooms().catch(() => [])
+      ]);
+      groups = teacherGroups.groups || [];
+      disciplines = teacherDisciplines.disciplines || [];
+      // Если нет дисциплин, показываем все (для первого занятия)
+      if (disciplines.length === 0) {
+        const allDisciplines = await api.getDisciplines().catch(() => []);
+        disciplines = allDisciplines;
+      }
+      rooms = allRooms;
+    } else {
+      // Для администратора показываем все
+      [groups, , disciplines, rooms] = await Promise.all([
+        api.getGroups(),
+        api.getTeachers(),
+        api.getDisciplines(),
+        api.getRooms(),
+      ]);
+    }
 
     const content = `
       <form id="lessonForm" onsubmit="saveLesson(event)">
@@ -84,16 +106,18 @@ async function editLesson(id) {
             ${groups.map(g => `<option value="${g.id}" ${g.id === lesson.group_id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
           </select>
         </div>
+        ${userInfo.role !== 'TEACHER' ? `
         <div class="form-group">
           <label>Преподаватель *</label>
           <select id="lessonTeacher" required>
-            ${teachers.map(t => {
+            ${(await api.getTeachers()).map(t => {
               const user = t.user;
               const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : '';
               return `<option value="${t.id}" ${t.id === lesson.teacher_id ? 'selected' : ''}>${escapeHtml(name)}</option>`;
             }).join('')}
           </select>
         </div>
+        ` : ''}
         <div class="form-group">
           <label>Дисциплина *</label>
           <select id="lessonDiscipline" required>
@@ -135,15 +159,24 @@ async function editLesson(id) {
 async function saveLesson(event) {
   event.preventDefault();
   
+  const userInfo = await api.getCurrentUser();
+  
   const formData = {
     group_id: parseInt(document.getElementById('lessonGroup').value),
-    teacher_id: parseInt(document.getElementById('lessonTeacher').value),
     discipline_id: parseInt(document.getElementById('lessonDiscipline').value),
     room_id: parseInt(document.getElementById('lessonRoom').value),
     start_time: new Date(document.getElementById('lessonStart').value).toISOString(),
     end_time: new Date(document.getElementById('lessonEnd').value).toISOString(),
     week: parseInt(document.getElementById('lessonWeek').value),
   };
+  
+  // Для администратора добавляем teacher_id, для преподавателя он устанавливается автоматически
+  if (userInfo.role !== 'TEACHER') {
+    const teacherSelect = document.getElementById('lessonTeacher');
+    if (teacherSelect) {
+      formData.teacher_id = parseInt(teacherSelect.value);
+    }
+  }
 
   try {
     if (window.currentLessonId) {
@@ -155,7 +188,11 @@ async function saveLesson(event) {
     }
     
     document.querySelector('.modal').remove();
-    if (typeof updateScheduleView === 'function') {
+    
+    // Перезагружаем текущую страницу
+    if (typeof loadManagePage === 'function') {
+      await loadManagePage();
+    } else if (typeof updateScheduleView === 'function') {
       updateScheduleView();
     }
   } catch (error) {
