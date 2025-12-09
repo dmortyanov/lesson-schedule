@@ -260,21 +260,18 @@ class ApiClient {
     return this.request('/lessons/');
   }
 
-  async getLessonsByGroup(groupId, week = null) {
+  async getLessonsByGroup(groupId) {
     const params = new URLSearchParams({ group_id: groupId });
-    if (week) params.append('week', week);
     return this.request(`/lessons/by_group/?${params.toString()}`);
   }
 
-  async getLessonsByTeacher(teacherId, week = null) {
+  async getLessonsByTeacher(teacherId) {
     const params = new URLSearchParams({ teacher_id: teacherId });
-    if (week) params.append('week', week);
     return this.request(`/lessons/by_teacher/?${params.toString()}`);
   }
 
-  async getLessonsByRoom(roomId, week = null) {
+  async getLessonsByRoom(roomId) {
     const params = new URLSearchParams({ room_id: roomId });
-    if (week) params.append('week', week);
     return this.request(`/lessons/by_room/?${params.toString()}`);
   }
 

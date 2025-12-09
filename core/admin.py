@@ -42,8 +42,8 @@ class RoomAdmin(admin.ModelAdmin):
 
 @admin.register(models.Lesson)
 class LessonAdmin(admin.ModelAdmin):
-    list_display = ["discipline", "group", "teacher", "room", "start_time", "end_time", "week"]
-    list_filter = ["group", "teacher", "room", "week"]
+    list_display = ["discipline", "group", "teacher", "room", "start_time", "end_time"]
+    list_filter = ["group", "teacher", "room"]
     search_fields = ["discipline__name", "group__name", "teacher__user__last_name"]
 
 

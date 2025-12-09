@@ -91,14 +91,13 @@ class Lesson(models.Model):
     room = models.ForeignKey(Room, on_delete=models.PROTECT, related_name="lessons")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    week = models.PositiveIntegerField()
 
     class Meta:
         verbose_name = "Занятие"
         verbose_name_plural = "Занятия"
         indexes = [
             models.Index(fields=["start_time", "end_time"]),
-            models.Index(fields=["week", "group"]),
+            models.Index(fields=["group"]),
             models.Index(fields=["room"]),
         ]
         constraints = [

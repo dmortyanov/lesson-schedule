@@ -29,31 +29,6 @@ function formatTime(dateString) {
   });
 }
 
-// Получить номер недели от начала года
-function getWeekNumber(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-}
-
-// Получить дату начала недели
-function getWeekStart(date = new Date()) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Понедельник
-  return new Date(d.setDate(diff));
-}
-
-// Получить дату конца недели
-function getWeekEnd(date = new Date()) {
-  const start = getWeekStart(date);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  return end;
-}
-
 // Преобразовать ISO строку в формат для input[type="datetime-local"]
 function toLocalDateTimeString(dateString) {
   const date = new Date(dateString);
@@ -144,7 +119,6 @@ function createScheduleTable(lessons, options = {}) {
   if (showTeacher) html += '<th>Преподаватель</th>';
   if (showRoom) html += '<th>Аудитория</th>';
   html += '<th>Дата и время</th>';
-  html += '<th>Неделя</th>';
   if (auth.canEditLessons()) html += '<th>Действия</th>';
   
   html += '</tr></thead><tbody>';
@@ -160,7 +134,6 @@ function createScheduleTable(lessons, options = {}) {
     }
     if (showRoom) html += `<td>${escapeHtml(lesson.room?.name || '')}</td>`;
     html += `<td>${formatDateTime(lesson.start_time)} - ${formatTime(lesson.end_time)}</td>`;
-    html += `<td>${lesson.week || ''}</td>`;
     
     if (auth.canEditLessons()) {
       html += '<td>';

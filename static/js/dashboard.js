@@ -285,10 +285,6 @@ async function loadSearchPage() {
               </select>
             </div>
             <div class="form-group">
-              <label for="searchGroupWeek">Неделя (опционально):</label>
-              <input type="number" id="searchGroupWeek" class="form-control" min="1" placeholder="Номер недели">
-            </div>
-            <div class="form-group">
               <label for="searchGroupStartDate">Начальная дата (опционально):</label>
               <input type="datetime-local" id="searchGroupStartDate" class="form-control">
             </div>
@@ -313,10 +309,6 @@ async function loadSearchPage() {
               </select>
             </div>
             <div class="form-group">
-              <label for="searchTeacherWeek">Неделя (опционально):</label>
-              <input type="number" id="searchTeacherWeek" class="form-control" min="1" placeholder="Номер недели">
-            </div>
-            <div class="form-group">
               <label for="searchTeacherStartDate">Начальная дата (опционально):</label>
               <input type="datetime-local" id="searchTeacherStartDate" class="form-control">
             </div>
@@ -339,10 +331,6 @@ async function loadSearchPage() {
                 <option value="">Выберите аудиторию</option>
                 ${rooms.map(r => `<option value="${r.id}">${r.name} (${r.room_type === 'lecture' ? 'Лекционная' : 'Лабораторная'}, ${r.capacity} мест)</option>`).join('')}
               </select>
-            </div>
-            <div class="form-group">
-              <label for="searchRoomWeek">Неделя (опционально):</label>
-              <input type="number" id="searchRoomWeek" class="form-control" min="1" placeholder="Номер недели">
             </div>
             <div class="form-group">
               <label for="searchRoomStartDate">Начальная дата (опционально):</label>
@@ -402,7 +390,6 @@ function setupSearchForms() {
   document.getElementById('searchByGroupForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const groupId = document.getElementById('searchGroup').value;
-    const week = document.getElementById('searchGroupWeek').value;
     const startDate = document.getElementById('searchGroupStartDate').value;
     const endDate = document.getElementById('searchGroupEndDate').value;
     const resultsDiv = document.getElementById('searchGroupResults');
@@ -411,7 +398,6 @@ function setupSearchForms() {
     
     try {
       let params = new URLSearchParams({ group_id: groupId });
-      if (week) params.append('week', week);
       if (startDate) params.append('start_date', new Date(startDate).toISOString());
       if (endDate) params.append('end_date', new Date(endDate).toISOString());
       
@@ -426,7 +412,6 @@ function setupSearchForms() {
   document.getElementById('searchByTeacherForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const teacherId = document.getElementById('searchTeacher').value;
-    const week = document.getElementById('searchTeacherWeek').value;
     const startDate = document.getElementById('searchTeacherStartDate').value;
     const endDate = document.getElementById('searchTeacherEndDate').value;
     const resultsDiv = document.getElementById('searchTeacherResults');
@@ -435,7 +420,6 @@ function setupSearchForms() {
     
     try {
       let params = new URLSearchParams({ teacher_id: teacherId });
-      if (week) params.append('week', week);
       if (startDate) params.append('start_date', new Date(startDate).toISOString());
       if (endDate) params.append('end_date', new Date(endDate).toISOString());
       
@@ -450,7 +434,6 @@ function setupSearchForms() {
   document.getElementById('searchByRoomForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const roomId = document.getElementById('searchRoom').value;
-    const week = document.getElementById('searchRoomWeek').value;
     const startDate = document.getElementById('searchRoomStartDate').value;
     const endDate = document.getElementById('searchRoomEndDate').value;
     const resultsDiv = document.getElementById('searchRoomResults');
@@ -459,7 +442,6 @@ function setupSearchForms() {
     
     try {
       let params = new URLSearchParams({ room_id: roomId });
-      if (week) params.append('week', week);
       if (startDate) params.append('start_date', new Date(startDate).toISOString());
       if (endDate) params.append('end_date', new Date(endDate).toISOString());
       
@@ -526,7 +508,6 @@ function displayLessonsResults(container, data) {
       <div class="lesson-card">
         <div class="lesson-header">
           <strong>${lesson.discipline.name}</strong>
-          <span class="lesson-week">Неделя ${lesson.week}</span>
         </div>
         <div class="lesson-details">
           <p><strong>Группа:</strong> ${lesson.group.name}</p>
@@ -672,7 +653,6 @@ async function loadTeacherManagePage(userInfo) {
                     <div class="lesson-card">
                       <div class="lesson-header">
                         <strong>${lesson.discipline.name}</strong>
-                        <span class="lesson-week">Неделя ${lesson.week}</span>
                       </div>
                       <div class="lesson-details">
                         <p><strong>Группа:</strong> ${lesson.group.name}</p>
@@ -763,10 +743,6 @@ async function showAddLessonModalForTeacher() {
         <div class="form-group">
           <label>Окончание *</label>
           <input type="datetime-local" id="lessonEnd" required>
-        </div>
-        <div class="form-group">
-          <label>Неделя *</label>
-          <input type="number" id="lessonWeek" min="1" max="52" value="${getWeekNumber(new Date())}" required>
         </div>
         <div class="d-flex gap-2 justify-between">
           <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Отмена</button>

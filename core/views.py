@@ -162,6 +162,74 @@ class LessonViewSet(viewsets.ModelViewSet):
     serializer_class = LessonSerializer
     permission_classes = [LessonPermission]
 
+    def _validate_time_conflicts(
+        self,
+        *,
+        start_time,
+        end_time,
+        room: Room,
+        teacher: Teacher,
+        instance: Lesson | None = None,
+    ) -> None:
+        """
+        Проверка конфликтов по времени:
+        - аудитория уже занята
+        - преподаватель уже ведёт пару в это время
+        В случае конфликта выбрасывает ValidationError с подсказками по свободным аудиториям.
+        """
+        # Базовый фильтр пересечения по времени
+        overlap_q = Q(start_time__lt=end_time, end_time__gt=start_time)
+
+        # Исключаем текущий объект при обновлении
+        base_qs = Lesson.objects.all()
+        if instance is not None and instance.pk:
+            base_qs = base_qs.exclude(pk=instance.pk)
+
+        # Конфликт по аудитории
+        room_conflicts = base_qs.filter(overlap_q, room=room)
+
+        # Конфликт по преподавателю
+        teacher_conflicts = base_qs.filter(overlap_q, teacher=teacher)
+
+        if not room_conflicts.exists() and not teacher_conflicts.exists():
+            return
+
+        errors: dict[str, list[str]] = {}
+
+        # Сообщение о конфликте аудитории + подбор свободных аудиторий
+        if room_conflicts.exists():
+            # Подбираем несколько свободных аудиторий на этот же интервал
+            busy_rooms_subq = Lesson.objects.filter(
+                overlap_q,
+                room=OuterRef("pk"),
+            )
+            free_rooms_qs = (
+                Room.objects.annotate(is_busy=Exists(busy_rooms_subq))
+                .filter(is_busy=False)
+                .order_by("name")[:5]
+            )
+            suggestions = [r.name for r in free_rooms_qs]
+
+            msg = (
+                f"Аудитория {room.name} уже занята в интервале "
+                f"{start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
+            )
+            if suggestions:
+                msg += " Свободные аудитории в это время: " + ", ".join(suggestions)
+
+            errors.setdefault("room_id", []).append(msg)
+
+        # Сообщение о конфликте преподавателя
+        if teacher_conflicts.exists():
+            msg = (
+                f"Преподаватель {teacher} уже ведёт занятие в интервале "
+                f"{start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
+            )
+            errors.setdefault("teacher_id", []).append(msg)
+
+        # Поднимаем единое исключение
+        raise drf_serializers.ValidationError(errors)
+
     def get_queryset(self):
         """Фильтруем queryset для преподавателей - показываем только их занятия"""
         qs = super().get_queryset()
@@ -178,16 +246,7 @@ class LessonViewSet(viewsets.ModelViewSet):
         if IsTeacher().has_permission(self.request, self):
             try:
                 teacher = Teacher.objects.select_related('department').get(user=self.request.user)
-                
-                # Валидация: проверяем, что дисциплина принадлежит преподавателю
-                discipline_id = serializer.validated_data.get('discipline_id') or serializer.validated_data.get('discipline').id
-                teacher_disciplines = Discipline.objects.filter(lessons__teacher=teacher).distinct()
-                
-                if not teacher_disciplines.filter(id=discipline_id).exists():
-                    # Если у преподавателя еще нет занятий по этой дисциплине, разрешаем создать первое
-                    # (для новых преподавателей)
-                    pass  # Разрешаем создать первое занятие
-                
+
                 # Валидация: проверяем, что группа принадлежит кафедре преподавателя
                 group_id = serializer.validated_data.get('group_id') or serializer.validated_data.get('group').id
                 group = GroupModel.objects.select_related('department').get(id=group_id)
@@ -196,36 +255,85 @@ class LessonViewSet(viewsets.ModelViewSet):
                     raise drf_serializers.ValidationError({
                         'group_id': f'Вы можете создавать занятия только для групп своей кафедры ({teacher.department.name})'
                     })
-                
+
+                # Валидация конфликтов по времени (аудитория / преподаватель)
+                start_time = serializer.validated_data.get("start_time")
+                end_time = serializer.validated_data.get("end_time")
+                room = serializer.validated_data.get("room")
+                if room is None:
+                    room_id = serializer.validated_data.get("room_id")
+                    room = Room.objects.get(id=room_id)
+
+                self._validate_time_conflicts(
+                    start_time=start_time,
+                    end_time=end_time,
+                    room=room,
+                    teacher=teacher,
+                    instance=None,
+                )
+
                 # Устанавливаем преподавателя автоматически
-                serializer.save(teacher=teacher)
+                serializer.save(teacher=teacher, week=week_number)
             except Teacher.DoesNotExist:
-                serializer.save()
+                # Для пользователя без Teacher-связи просто сохраняем, вычислив неделю
+                start_time = serializer.validated_data.get("start_time")
+                if start_time is not None:
+                    week_number = start_time.isocalendar().week
+                    serializer.save(week=week_number)
+                else:
+                    serializer.save()
         else:
-            serializer.save()
+            # Для администратора БД: тоже автоматически проставляем неделю
+            start_time = serializer.validated_data.get("start_time")
+            if start_time is not None:
+                week_number = start_time.isocalendar().week
+                serializer.save(week=week_number)
+            else:
+                serializer.save()
     
     def perform_update(self, serializer):
         """При обновлении занятия преподавателем валидируем ограничения"""
         if IsTeacher().has_permission(self.request, self):
             try:
                 teacher = Teacher.objects.select_related('department').get(user=self.request.user)
-                
-                # Валидация дисциплины
-                discipline = serializer.validated_data.get('discipline') or self.get_object().discipline
-                teacher_disciplines = Discipline.objects.filter(lessons__teacher=teacher).distinct()
-                
+
                 # Валидация группы
-                group = serializer.validated_data.get('group') or self.get_object().group
+                instance = self.get_object()
+                group = serializer.validated_data.get('group') or instance.group
                 if group.department_id != teacher.department_id:
                     raise drf_serializers.ValidationError({
                         'group_id': f'Вы можете создавать занятия только для групп своей кафедры ({teacher.department.name})'
                     })
-                
-                serializer.save()
+
+                # Валидация конфликтов по времени (аудитория / преподаватель)
+                start_time = serializer.validated_data.get("start_time") or instance.start_time
+                end_time = serializer.validated_data.get("end_time") or instance.end_time
+                room = serializer.validated_data.get("room") or instance.room
+
+                # Автоматически пересчитываем номер недели по (возможно изменённой) дате начала
+                week_number = start_time.isocalendar().week
+
+                self._validate_time_conflicts(
+                    start_time=start_time,
+                    end_time=end_time,
+                    room=room,
+                    teacher=teacher,
+                    instance=instance,
+                )
+
+                serializer.save(week=week_number)
             except Teacher.DoesNotExist:
-                serializer.save()
+                # Если нет Teacher-связи, просто обновляем и проставляем неделю
+                instance = self.get_object()
+                start_time = serializer.validated_data.get("start_time") or instance.start_time
+                week_number = start_time.isocalendar().week
+                serializer.save(week=week_number)
         else:
-            serializer.save()
+            # Для администратора БД: тоже автоматически проставляем неделю
+            instance = self.get_object()
+            start_time = serializer.validated_data.get("start_time") or instance.start_time
+            week_number = start_time.isocalendar().week
+            serializer.save(week=week_number)
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def by_group(self, request):
@@ -234,12 +342,10 @@ class LessonViewSet(viewsets.ModelViewSet):
         
         Query params:
         - group_id: ID группы (обязательный)
-        - week: номер недели (опционально)
         - start_date: начальная дата (ISO format, опционально)
         - end_date: конечная дата (ISO format, опционально)
         """
         group_id = request.query_params.get("group_id")
-        week = request.query_params.get("week")
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
         
@@ -259,16 +365,6 @@ class LessonViewSet(viewsets.ModelViewSet):
             )
         
         qs = self.queryset.filter(group_id=group_id)
-        
-        # Фильтрация по неделе
-        if week:
-            try:
-                qs = qs.filter(week=int(week))
-            except ValueError:
-                return Response(
-                    {"detail": "Параметр week должен быть числом"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
         
         # Фильтрация по дате
         if start_date_str:
@@ -308,12 +404,10 @@ class LessonViewSet(viewsets.ModelViewSet):
         
         Query params:
         - teacher_id: ID преподавателя (обязательный)
-        - week: номер недели (опционально)
         - start_date: начальная дата (ISO format, опционально)
         - end_date: конечная дата (ISO format, опционально)
         """
         teacher_id = request.query_params.get("teacher_id")
-        week = request.query_params.get("week")
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
         
@@ -333,16 +427,6 @@ class LessonViewSet(viewsets.ModelViewSet):
             )
         
         qs = self.queryset.filter(teacher_id=teacher_id)
-        
-        # Фильтрация по неделе
-        if week:
-            try:
-                qs = qs.filter(week=int(week))
-            except ValueError:
-                return Response(
-                    {"detail": "Параметр week должен быть числом"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
         
         # Фильтрация по дате
         if start_date_str:
@@ -385,12 +469,10 @@ class LessonViewSet(viewsets.ModelViewSet):
         
         Query params:
         - room_id: ID аудитории (обязательный)
-        - week: номер недели (опционально)
         - start_date: начальная дата (ISO format, опционально)
         - end_date: конечная дата (ISO format, опционально)
         """
         room_id = request.query_params.get("room_id")
-        week = request.query_params.get("week")
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
         
@@ -410,16 +492,6 @@ class LessonViewSet(viewsets.ModelViewSet):
             )
         
         qs = self.queryset.filter(room_id=room_id)
-        
-        # Фильтрация по неделе
-        if week:
-            try:
-                qs = qs.filter(week=int(week))
-            except ValueError:
-                return Response(
-                    {"detail": "Параметр week должен быть числом"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
         
         # Фильтрация по дате
         if start_date_str:

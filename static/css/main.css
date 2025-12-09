@@ -740,15 +740,6 @@ tbody tr:last-child td {
   font-size: 1.1rem;
 }
 
-.lesson-week, .room-type {
-  background: var(--accent-blue);
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
 .lesson-details, .room-details {
   color: var(--text-secondary);
 }

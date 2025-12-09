@@ -48,10 +48,6 @@ async function showAddLessonModal() {
           <label>Окончание *</label>
           <input type="datetime-local" id="lessonEnd" required>
         </div>
-        <div class="form-group">
-          <label>Неделя *</label>
-          <input type="number" id="lessonWeek" min="1" max="52" value="${getWeekNumber(new Date())}" required>
-        </div>
         <div class="d-flex gap-2 justify-between">
           <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Отмена</button>
           <button type="submit" class="btn">Сохранить</button>
@@ -138,10 +134,6 @@ async function editLesson(id) {
           <label>Окончание *</label>
           <input type="datetime-local" id="lessonEnd" value="${toLocalDateTimeString(lesson.end_time)}" required>
         </div>
-        <div class="form-group">
-          <label>Неделя *</label>
-          <input type="number" id="lessonWeek" min="1" max="52" value="${lesson.week}" required>
-        </div>
         <div class="d-flex gap-2 justify-between">
           <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Отмена</button>
           <button type="submit" class="btn">Сохранить</button>
@@ -167,7 +159,6 @@ async function saveLesson(event) {
     room_id: parseInt(document.getElementById('lessonRoom').value),
     start_time: new Date(document.getElementById('lessonStart').value).toISOString(),
     end_time: new Date(document.getElementById('lessonEnd').value).toISOString(),
-    week: parseInt(document.getElementById('lessonWeek').value),
   };
   
   // Для администратора добавляем teacher_id, для преподавателя он устанавливается автоматически
