@@ -617,13 +617,14 @@ async function loadTeacherManagePage(userInfo) {
     const [teacherGroups, teacherDisciplines, teacherLessons, allRooms] = await Promise.all([
       api.getTeacherGroups().catch(() => ({ groups: [] })),
       api.getTeacherDisciplines().catch(() => ({ disciplines: [] })),
-      api.getLessons().catch(() => []),
+      api.getLessonsByTeacher(userInfo.teacher_id).catch(() => []),
       api.getRooms().catch(() => [])
     ]);
     
     const groups = teacherGroups.groups || [];
     const disciplines = teacherDisciplines.disciplines || [];
-    const lessons = teacherLessons.results || teacherLessons || [];
+    const teacherLessonsResponse = await api.getLessonsByTeacher(userInfo.teacher_id).catch(() => ({ lessons: [] }));
+    const lessons = teacherLessonsResponse.lessons || [];
     const departmentName = teacherGroups.department_name || userInfo.teacher_department_name || 'Не указана';
     
     content.innerHTML = `

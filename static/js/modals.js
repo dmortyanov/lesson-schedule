@@ -77,6 +77,10 @@ async function editLesson(id) {
         api.getRooms().catch(() => [])
       ]);
       groups = teacherGroups.groups || [];
+      if (groups.length === 0) {
+        showError('Нет доступных групп для вашей кафедры.');
+        return;
+      }
       disciplines = teacherDisciplines.disciplines || [];
       // Если нет дисциплин, показываем все (для первого занятия)
       if (disciplines.length === 0) {
@@ -103,16 +107,16 @@ async function editLesson(id) {
           </select>
         </div>
         ${userInfo.role !== 'TEACHER' ? `
-        <div class="form-group">
-          <label>Преподаватель *</label>
-          <select id="lessonTeacher" required>
-            ${(await api.getTeachers()).map(t => {
-              const user = t.user;
-              const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : '';
-              return `<option value="${t.id}" ${t.id === lesson.teacher_id ? 'selected' : ''}>${escapeHtml(name)}</option>`;
-            }).join('')}
-          </select>
-        </div>
+        // <div class="form-group">
+        //   <label>Преподаватель *</label>
+        //   <select id="lessonTeacher" required>
+        //     ${(await api.getTeachers()).map(t => {
+        //       const user = t.user;
+        //       const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : '';
+        //       return `<option value="${t.id}" ${t.id === lesson.teacher_id ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+        //     }).join('')}
+        //   </select>
+        // </div>
         ` : ''}
         <div class="form-group">
           <label>Дисциплина *</label>
