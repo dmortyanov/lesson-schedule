@@ -91,8 +91,9 @@ class Lesson(models.Model):
     room = models.ForeignKey(Room, on_delete=models.PROTECT, related_name="lessons")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    # Номер недели (ISO); автозаполняется в save()
+
     week = models.PositiveIntegerField(null=True, blank=True)
+
 
     class Meta:
         verbose_name = "Занятие"
@@ -101,7 +102,9 @@ class Lesson(models.Model):
             models.Index(fields=["start_time", "end_time"]),
             models.Index(fields=["group"]),
             models.Index(fields=["room"]),
+
             models.Index(fields=["week"]),
+
         ]
         constraints = [
             models.CheckConstraint(check=models.Q(end_time__gt=models.F("start_time")), name="lesson_time_order"),

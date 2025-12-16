@@ -163,12 +163,30 @@ class LessonViewSet(viewsets.ModelViewSet):
     permission_classes = [LessonPermission]
 
     def _validate_time_conflicts(
+
         self, *, start_time, end_time, room, teacher, group, instance=None
     ):
         from rest_framework import serializers as drf_serializers
         from .models import Lesson, Room
 
         overlap_q = Q(start_time__lt=end_time, end_time__gt=start_time)
+        self,
+        *,
+        start_time,
+        end_time,
+        room: Room,
+        teacher: Teacher,
+        instance: Lesson | None = None,) -> None:
+        """
+        Проверка конфликтов по времени:
+        - аудитория уже занята
+        - преподаватель уже ведёт пару в это время
+        В случае конфликта выбрасывает ValidationError с подсказками по свободным аудиториям.
+        """
+        # Базовый фильтр пересечения по времени
+        overlap_q = Q(start_time__lt=end_time, end_time__gt=start_time)
+
+
         base_qs = Lesson.objects.all()
         if instance is not None and instance.pk:
             base_qs = base_qs.exclude(pk=instance.pk)
@@ -192,6 +210,49 @@ class LessonViewSet(viewsets.ModelViewSet):
         if group_conflicts.exists():
             msg = f"Группа {group} уже занята в интервале {start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
             errors.setdefault("group_id", []).append(msg)
+        # Конфликт по аудитории
+        room_conflicts = base_qs.filter(overlap_q, room=room)
+
+        # Конфликт по преподавателю
+        teacher_conflicts = base_qs.filter(overlap_q, teacher=teacher)
+
+        if not room_conflicts.exists() and not teacher_conflicts.exists():
+            return
+
+        errors: dict[str, list[str]] = {}
+
+        # Сообщение о конфликте аудитории + подбор свободных аудиторий
+        if room_conflicts.exists():
+            # Подбираем несколько свободных аудиторий на этот же интервал
+            busy_rooms_subq = Lesson.objects.filter(
+                overlap_q,
+                room=OuterRef("pk"),
+            )
+            free_rooms_qs = (
+                Room.objects.annotate(is_busy=Exists(busy_rooms_subq))
+                .filter(is_busy=False)
+                .order_by("name")[:5]
+            )
+            suggestions = [r.name for r in free_rooms_qs]
+
+            msg = (
+                f"Аудитория {room.name} уже занята в интервале "
+                f"{start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
+            )
+            if suggestions:
+                msg += " Свободные аудитории в это время: " + ", ".join(suggestions)
+
+            errors.setdefault("room_id", []).append(msg)
+
+        # Сообщение о конфликте преподавателя
+        if teacher_conflicts.exists():
+            msg = (
+                f"Преподаватель {teacher} уже ведёт занятие в интервале "
+                f"{start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
+            )
+            errors.setdefault("teacher_id", []).append(msg)
+
+        # Поднимаем единое исключение
 
         raise drf_serializers.ValidationError(errors)
 
@@ -229,6 +290,7 @@ class LessonViewSet(viewsets.ModelViewSet):
                     room_id = serializer.validated_data.get("room_id")
                     room = Room.objects.get(id=room_id)
 
+
                 week_number = start_time.isocalendar().week
 
                 self._validate_time_conflicts(
@@ -236,7 +298,9 @@ class LessonViewSet(viewsets.ModelViewSet):
                     end_time=end_time,
                     room=room,
                     teacher=teacher,
+
                     group=group,
+
                     instance=None,
                 )
 
@@ -286,6 +350,7 @@ class LessonViewSet(viewsets.ModelViewSet):
                     end_time=end_time,
                     room=room,
                     teacher=teacher,
+
                     group=group,
                     instance=instance,
                 )

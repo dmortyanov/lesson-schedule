@@ -264,18 +264,26 @@ class ApiClient {
     const params = new URLSearchParams({ group_id: groupId });
     const data = await this.request(`/lessons/by_group/?${params.toString()}`);
     return data.lessons || [];
+    return this.request(`/lessons/by_group/?${params.toString()}`);
   }
 
   async getLessonsByTeacher(teacherId) {
     const params = new URLSearchParams({ teacher_id: teacherId });
+
     const data = await this.request(`/lessons/by_teacher/?${params.toString()}`);
     return data.lessons || [];
+    return this.request(`/lessons/by_teacher/?${params.toString()}`);
+
   }
 
   async getLessonsByRoom(roomId) {
     const params = new URLSearchParams({ room_id: roomId });
+
     const data = await this.request(`/lessons/by_room/?${params.toString()}`);
     return data.lessons || [];
+
+    return this.request(`/lessons/by_room/?${params.toString()}`);
+
   }
 
   async createLesson(data) {

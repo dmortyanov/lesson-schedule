@@ -624,6 +624,8 @@ async function loadTeacherManagePage(userInfo) {
     const groups = teacherGroups.groups || [];
     const disciplines = teacherDisciplines.disciplines || [];
     const lessons = Array.isArray(teacherLessons) ? teacherLessons : [];
+    const teacherLessonsResponse = await api.getLessonsByTeacher(userInfo.teacher_id).catch(() => ({ lessons: [] }));
+    const lessons = teacherLessonsResponse.lessons || [];
     const departmentName = teacherGroups.department_name || userInfo.teacher_department_name || 'Не указана';
     
     content.innerHTML = `
