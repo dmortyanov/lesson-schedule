@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             name='Department',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, unique=True)),
+                ('name', models.CharField(max_length=191, unique=True)),
             ],
             options={
                 'verbose_name': 'Кафедра',
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
             name='Discipline',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, unique=True)),
+                ('name', models.CharField(max_length=191, unique=True)),
             ],
             options={
                 'verbose_name': 'Дисциплина',
@@ -116,7 +116,7 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'Занятие',
                 'verbose_name_plural': 'Занятия',
-                'indexes': [models.Index(fields=['start_time', 'end_time', 'room'], name='core_lesson_start_t_0f9aa2_idx'), models.Index(fields=['week', 'group'], name='core_lesson_week_0df2ce_idx')],
+                'indexes': [models.Index(fields=['start_time', 'end_time'], name='core_lesson_start_t_0f9aa2_idx'), models.Index(fields=['week', 'group'], name='core_lesson_week_0df2ce_idx'), models.Index(fields=['room'], name='core_lesson_room_idx')],
             },
         ),
         migrations.AddConstraint(

@@ -19,8 +19,6 @@
       <h3>2) Расписание по группе</h3>
       <label>ID группы</label>
       <input id="group-id" placeholder="например, 1">
-      <label>Неделя (необязательно)</label>
-      <input id="group-week" placeholder="номер недели">
       <div style="margin-top:10px">
         <button onclick="byGroup()">Показать</button>
       </div>
@@ -30,8 +28,6 @@
       <h3>3) Расписание по преподавателю</h3>
       <label>ID преподавателя</label>
       <input id="teacher-id" placeholder="например, 1">
-      <label>Неделя (необязательно)</label>
-      <input id="teacher-week" placeholder="номер недели">
       <div style="margin-top:10px">
         <button onclick="byTeacher()">Показать</button>
       </div>
@@ -86,17 +82,13 @@
     }
     async function byGroup(){
       const gid = document.getElementById('group-id').value;
-      const week = document.getElementById('group-week').value;
       const q = new URLSearchParams({ group_id: gid || '' });
-      if (week) q.set('week', week);
       const r = await api('/api/lessons/by_group/?' + q.toString());
       out(r);
     }
     async function byTeacher(){
       const tid = document.getElementById('teacher-id').value;
-      const week = document.getElementById('teacher-week').value;
       const q = new URLSearchParams({ teacher_id: tid || '' });
-      if (week) q.set('week', week);
       const r = await api('/api/lessons/by_teacher/?' + q.toString());
       out(r);
     }

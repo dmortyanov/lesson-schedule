@@ -98,6 +98,7 @@ class LessonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lesson
+        # Поле week есть в модели, но во внешнем API не используется
         fields = [
             "id",
             "group",
@@ -110,6 +111,4 @@ class LessonSerializer(serializers.ModelSerializer):
             "room_id",
             "start_time",
             "end_time",
-            "week",
         ]
-

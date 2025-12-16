@@ -260,22 +260,22 @@ class ApiClient {
     return this.request('/lessons/');
   }
 
-  async getLessonsByGroup(groupId, week = null) {
+  async getLessonsByGroup(groupId) {
     const params = new URLSearchParams({ group_id: groupId });
-    if (week) params.append('week', week);
-    return this.request(`/lessons/by_group/?${params.toString()}`);
+    const data = await this.request(`/lessons/by_group/?${params.toString()}`);
+    return data.lessons || [];
   }
 
-  async getLessonsByTeacher(teacherId, week = null) {
+  async getLessonsByTeacher(teacherId) {
     const params = new URLSearchParams({ teacher_id: teacherId });
-    if (week) params.append('week', week);
-    return this.request(`/lessons/by_teacher/?${params.toString()}`);
+    const data = await this.request(`/lessons/by_teacher/?${params.toString()}`);
+    return data.lessons || [];
   }
 
-  async getLessonsByRoom(roomId, week = null) {
+  async getLessonsByRoom(roomId) {
     const params = new URLSearchParams({ room_id: roomId });
-    if (week) params.append('week', week);
-    return this.request(`/lessons/by_room/?${params.toString()}`);
+    const data = await this.request(`/lessons/by_room/?${params.toString()}`);
+    return data.lessons || [];
   }
 
   async createLesson(data) {
@@ -288,6 +288,16 @@ class ApiClient {
 
   async deleteLesson(id) {
     return this.request(`/lessons/${id}/`, { method: 'DELETE' });
+  }
+
+  // Получить дисциплины преподавателя
+  async getTeacherDisciplines() {
+    return this.request('/teacher/disciplines/');
+  }
+
+  // Получить группы кафедры преподавателя
+  async getTeacherGroups() {
+    return this.request('/teacher/groups/');
   }
 }
 

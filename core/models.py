@@ -4,7 +4,7 @@ from django.db import models
 
 
 class Department(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=191, unique=True)
 
     class Meta:
         verbose_name = "Кафедра"
@@ -38,6 +38,10 @@ class Teacher(models.Model):
 
     def __str__(self) -> str:
         return self.user.get_full_name() or self.user.username
+    
+    def get_disciplines(self):
+        """Получить список дисциплин, которые преподает этот преподаватель"""
+        return Discipline.objects.filter(lessons__teacher=self).distinct()
 
 
 class Student(models.Model):
@@ -53,7 +57,7 @@ class Student(models.Model):
 
 
 class Discipline(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=191, unique=True)
 
     class Meta:
         verbose_name = "Дисциплина"
@@ -87,14 +91,17 @@ class Lesson(models.Model):
     room = models.ForeignKey(Room, on_delete=models.PROTECT, related_name="lessons")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    week = models.PositiveIntegerField()
+    # Номер недели (ISO); автозаполняется в save()
+    week = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Занятие"
         verbose_name_plural = "Занятия"
         indexes = [
-            models.Index(fields=["start_time", "end_time", "room"]),
-            models.Index(fields=["week", "group"]),
+            models.Index(fields=["start_time", "end_time"]),
+            models.Index(fields=["group"]),
+            models.Index(fields=["room"]),
+            models.Index(fields=["week"]),
         ]
         constraints = [
             models.CheckConstraint(check=models.Q(end_time__gt=models.F("start_time")), name="lesson_time_order"),
@@ -102,6 +109,12 @@ class Lesson(models.Model):
 
     def __str__(self) -> str:
         return f"{self.discipline} {self.group} {self.start_time:%Y-%m-%d %H:%M}"
+
+    def save(self, *args, **kwargs):
+        # Автозаполняем номер недели, если не задан
+        if self.start_time and not self.week:
+            self.week = self.start_time.isocalendar().week
+        super().save(*args, **kwargs)
 
 
 class ChangeRequest(models.Model):
