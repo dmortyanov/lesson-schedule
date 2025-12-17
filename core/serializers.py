@@ -90,7 +90,14 @@ class LessonSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
     group_id = serializers.PrimaryKeyRelatedField(queryset=GroupModel.objects.all(), source="group", write_only=True)
     teacher = TeacherSerializer(read_only=True)
-    teacher_id = serializers.PrimaryKeyRelatedField(queryset=Teacher.objects.all(), source="teacher", write_only=True)
+    # Для преподавателя поле teacher_id заполняется автоматически на бэкенде
+    teacher_id = serializers.PrimaryKeyRelatedField(
+        queryset=Teacher.objects.all(),
+        source="teacher",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     discipline = DisciplineSerializer(read_only=True)
     discipline_id = serializers.PrimaryKeyRelatedField(queryset=Discipline.objects.all(), source="discipline", write_only=True)
     room = RoomSerializer(read_only=True)

@@ -37,7 +37,29 @@ class ApiClient {
       const data = await response.json().catch(() => ({}));
       
       if (!response.ok) {
-        throw new Error(data.detail || data.message || `Ошибка ${response.status}`);
+        // Форматируем ошибки в человекочитаемый вид
+        const formatError = (payload) => {
+          if (!payload) return `Ошибка ${response.status}`;
+          if (typeof payload === 'string') return payload;
+          if (Array.isArray(payload)) return payload.join('; ');
+          if (typeof payload === 'object') {
+            const parts = [];
+            for (const key of Object.keys(payload)) {
+              const val = payload[key];
+              if (Array.isArray(val)) {
+                parts.push(`${key}: ${val.join('; ')}`);
+              } else if (typeof val === 'object') {
+                parts.push(`${key}: ${JSON.stringify(val)}`);
+              } else {
+                parts.push(`${key}: ${val}`);
+              }
+            }
+            return parts.join(' | ') || `Ошибка ${response.status}`;
+          }
+          return `Ошибка ${response.status}`;
+        };
+
+        throw new Error(formatError(data) || data.detail || data.message || `Ошибка ${response.status}`);
       }
 
       return data;
@@ -269,11 +291,7 @@ class ApiClient {
 
   async getLessonsByTeacher(teacherId) {
     const params = new URLSearchParams({ teacher_id: teacherId });
-
-    const data = await this.request(`/lessons/by_teacher/?${params.toString()}`);
-    return data.lessons || [];
     return this.request(`/lessons/by_teacher/?${params.toString()}`);
-
   }
 
   async getLessonsByRoom(roomId) {

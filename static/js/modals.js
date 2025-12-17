@@ -68,7 +68,7 @@ async function editLesson(id) {
     const userInfo = await api.getCurrentUser();
     
     // Для преподавателя используем ограниченные данные
-    let groups, disciplines, rooms;
+    let groups, disciplines, rooms, teachersList = [];
     
     if (userInfo.role === 'TEACHER') {
       const [teacherGroups, teacherDisciplines, allRooms] = await Promise.all([
@@ -90,13 +90,30 @@ async function editLesson(id) {
       rooms = allRooms;
     } else {
       // Для администратора показываем все
-      [groups, , disciplines, rooms] = await Promise.all([
+      [groups, teachersList, disciplines, rooms] = await Promise.all([
         api.getGroups(),
         api.getTeachers(),
         api.getDisciplines(),
         api.getRooms(),
       ]);
     }
+
+    const teacherOptions = teachersList.map(t => {
+      const user = t.user;
+      const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : '';
+      return `<option value="${t.id}" ${t.id === lesson.teacher_id ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+    }).join('');
+
+    const teacherBlock = userInfo.role !== 'TEACHER'
+      ? `
+        <div class="form-group">
+          <label>Преподаватель *</label>
+          <select id="lessonTeacher" required>
+            ${teacherOptions}
+          </select>
+        </div>
+        `
+      : '';
 
     const content = `
       <form id="lessonForm" onsubmit="saveLesson(event)">
@@ -106,18 +123,7 @@ async function editLesson(id) {
             ${groups.map(g => `<option value="${g.id}" ${g.id === lesson.group_id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
           </select>
         </div>
-        ${userInfo.role !== 'TEACHER' ? `
-        // <div class="form-group">
-        //   <label>Преподаватель *</label>
-        //   <select id="lessonTeacher" required>
-        //     ${(await api.getTeachers()).map(t => {
-        //       const user = t.user;
-        //       const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : '';
-        //       return `<option value="${t.id}" ${t.id === lesson.teacher_id ? 'selected' : ''}>${escapeHtml(name)}</option>`;
-        //     }).join('')}
-        //   </select>
-        // </div>
-        ` : ''}
+        ${teacherBlock}
         <div class="form-group">
           <label>Дисциплина *</label>
           <select id="lessonDiscipline" required>
@@ -191,7 +197,24 @@ async function saveLesson(event) {
       updateScheduleView();
     }
   } catch (error) {
-    showError('Ошибка сохранения: ' + error.message);
+    // Отдельно показываем подсказку по свободным аудиториям, если есть
+    const msg = error.message || '';
+    const parts = msg.split('Свободные аудитории в это время:');
+    if (parts.length > 1) {
+      showError('Ошибка сохранения: ' + parts[0].trim());
+      const hintText = 'Свободные аудитории: ' + parts[1].trim();
+      let hint = document.getElementById('freeRoomsHint');
+      if (!hint) {
+        hint = document.createElement('div');
+        hint.id = 'freeRoomsHint';
+        hint.className = 'alert alert-info';
+        const host = document.getElementById('content') || document.body;
+        host.prepend(hint);
+      }
+      hint.textContent = hintText;
+    } else {
+      showError('Ошибка сохранения: ' + msg);
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 from datetime import datetime
+from django.utils import timezone
 from django.db.models import Q, Exists, OuterRef
 from rest_framework import viewsets, mixins, status, serializers as drf_serializers
 from rest_framework.decorators import action
@@ -163,30 +164,22 @@ class LessonViewSet(viewsets.ModelViewSet):
     permission_classes = [LessonPermission]
 
     def _validate_time_conflicts(
-
-        self, *, start_time, end_time, room, teacher, group, instance=None
-    ):
-        from rest_framework import serializers as drf_serializers
-        from .models import Lesson, Room
-
-        overlap_q = Q(start_time__lt=end_time, end_time__gt=start_time)
         self,
         *,
-        start_time,
-        end_time,
+        start_time: datetime,
+        end_time: datetime,
         room: Room,
         teacher: Teacher,
-        instance: Lesson | None = None,) -> None:
+        group: GroupModel,
+        instance: Lesson | None = None,
+    ) -> None:
         """
-        Проверка конфликтов по времени:
-        - аудитория уже занята
-        - преподаватель уже ведёт пару в это время
-        В случае конфликта выбрасывает ValidationError с подсказками по свободным аудиториям.
+        Проверяет пересечения расписания и подсказывает свободные аудитории.
+        Выбрасывает ValidationError при конфликте.
         """
-        # Базовый фильтр пересечения по времени
+        from rest_framework import serializers as drf_serializers
+
         overlap_q = Q(start_time__lt=end_time, end_time__gt=start_time)
-
-
         base_qs = Lesson.objects.all()
         if instance is not None and instance.pk:
             base_qs = base_qs.exclude(pk=instance.pk)
@@ -198,32 +191,9 @@ class LessonViewSet(viewsets.ModelViewSet):
         if not (room_conflicts.exists() or teacher_conflicts.exists() or group_conflicts.exists()):
             return
 
-        errors = {}
-        if room_conflicts.exists():
-            msg = f"Аудитория {room.name} уже занята в интервале {start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
-            errors.setdefault("room_id", []).append(msg)
-
-        if teacher_conflicts.exists():
-            msg = f"Преподаватель {teacher} уже ведёт занятие в интервале {start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
-            errors.setdefault("teacher_id", []).append(msg)
-
-        if group_conflicts.exists():
-            msg = f"Группа {group} уже занята в интервале {start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
-            errors.setdefault("group_id", []).append(msg)
-        # Конфликт по аудитории
-        room_conflicts = base_qs.filter(overlap_q, room=room)
-
-        # Конфликт по преподавателю
-        teacher_conflicts = base_qs.filter(overlap_q, teacher=teacher)
-
-        if not room_conflicts.exists() and not teacher_conflicts.exists():
-            return
-
         errors: dict[str, list[str]] = {}
 
-        # Сообщение о конфликте аудитории + подбор свободных аудиторий
         if room_conflicts.exists():
-            # Подбираем несколько свободных аудиторий на этот же интервал
             busy_rooms_subq = Lesson.objects.filter(
                 overlap_q,
                 room=OuterRef("pk"),
@@ -244,7 +214,6 @@ class LessonViewSet(viewsets.ModelViewSet):
 
             errors.setdefault("room_id", []).append(msg)
 
-        # Сообщение о конфликте преподавателя
         if teacher_conflicts.exists():
             msg = (
                 f"Преподаватель {teacher} уже ведёт занятие в интервале "
@@ -252,7 +221,12 @@ class LessonViewSet(viewsets.ModelViewSet):
             )
             errors.setdefault("teacher_id", []).append(msg)
 
-        # Поднимаем единое исключение
+        if group_conflicts.exists():
+            msg = (
+                f"Группа {group} уже занята в интервале "
+                f"{start_time:%d.%m.%Y %H:%M} - {end_time:%d.%m.%Y %H:%M}."
+            )
+            errors.setdefault("group_id", []).append(msg)
 
         raise drf_serializers.ValidationError(errors)
 
@@ -290,36 +264,40 @@ class LessonViewSet(viewsets.ModelViewSet):
                     room_id = serializer.validated_data.get("room_id")
                     room = Room.objects.get(id=room_id)
 
-
-                week_number = start_time.isocalendar().week
+                # Проверка дат: не в прошлом и не на выходных
+                now = timezone.now()
+                if start_time < now:
+                    raise drf_serializers.ValidationError({
+                        'start_time': 'Нельзя создавать занятия в прошлом. Укажите дату и время в будущем.'
+                    })
+                if start_time.weekday() >= 5:
+                    raise drf_serializers.ValidationError({
+                        'start_time': 'Нельзя создавать занятия на выходные (суббота/воскресенье).'
+                    })
 
                 self._validate_time_conflicts(
                     start_time=start_time,
                     end_time=end_time,
                     room=room,
                     teacher=teacher,
-
                     group=group,
-
                     instance=None,
                 )
 
                 # Устанавливаем преподавателя автоматически
-                serializer.save(teacher=teacher, week=week_number)
+                serializer.save(teacher=teacher)
             except Teacher.DoesNotExist:
-                # Для пользователя без Teacher-связи просто сохраняем, вычислив неделю
+                # Для пользователя без Teacher-связи просто сохраняем
                 start_time = serializer.validated_data.get("start_time")
                 if start_time is not None:
-                    week_number = start_time.isocalendar().week
-                    serializer.save(week=week_number)
+                    serializer.save()
                 else:
                     serializer.save()
         else:
-            # Для администратора БД: тоже автоматически проставляем неделю
+            # Для администратора БД: сохраняем как есть
             start_time = serializer.validated_data.get("start_time")
             if start_time is not None:
-                week_number = start_time.isocalendar().week
-                serializer.save(week=week_number)
+                serializer.save()
             else:
                 serializer.save()
     
@@ -342,8 +320,16 @@ class LessonViewSet(viewsets.ModelViewSet):
                 end_time = serializer.validated_data.get("end_time") or instance.end_time
                 room = serializer.validated_data.get("room") or instance.room
 
-                # Автоматически пересчитываем номер недели по (возможно изменённой) дате начала
-                week_number = start_time.isocalendar().week
+                # Проверка дат: не в прошлом и не на выходных
+                now = timezone.now()
+                if start_time < now:
+                    raise drf_serializers.ValidationError({
+                        'start_time': 'Нельзя переносить занятие в прошлое. Укажите дату и время в будущем.'
+                    })
+                if start_time.weekday() >= 5:
+                    raise drf_serializers.ValidationError({
+                        'start_time': 'Нельзя ставить занятия на выходные (суббота/воскресенье).'
+                    })
 
                 self._validate_time_conflicts(
                     start_time=start_time,
@@ -355,19 +341,17 @@ class LessonViewSet(viewsets.ModelViewSet):
                     instance=instance,
                 )
 
-                serializer.save(week=week_number)
+                serializer.save(teacher=teacher)
             except Teacher.DoesNotExist:
-                # Если нет Teacher-связи, просто обновляем и проставляем неделю
+                # Если нет Teacher-связи, просто обновляем
                 instance = self.get_object()
                 start_time = serializer.validated_data.get("start_time") or instance.start_time
-                week_number = start_time.isocalendar().week
-                serializer.save(week=week_number)
+                serializer.save()
         else:
-            # Для администратора БД: тоже автоматически проставляем неделю
+            # Для администратора БД: сохраняем как есть
             instance = self.get_object()
             start_time = serializer.validated_data.get("start_time") or instance.start_time
-            week_number = start_time.isocalendar().week
-            serializer.save(week=week_number)
+            serializer.save()
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def by_group(self, request):

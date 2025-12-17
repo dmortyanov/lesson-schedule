@@ -614,18 +614,16 @@ async function loadTeacherManagePage(userInfo) {
   
   try {
     // Загружаем данные преподавателя
-    const [teacherGroups, teacherDisciplines, teacherLessons, allRooms] = await Promise.all([
+    const [teacherGroups, teacherDisciplines, teacherLessonsResponse, allRooms] = await Promise.all([
       api.getTeacherGroups().catch(() => ({ groups: [] })),
       api.getTeacherDisciplines().catch(() => ({ disciplines: [] })),
-      api.getLessonsByTeacher(userInfo.teacher_id).catch(() => []),
+      api.getLessonsByTeacher(userInfo.teacher_id).catch(() => ({ lessons: [] })),
       api.getRooms().catch(() => [])
     ]);
     
     const groups = teacherGroups.groups || [];
     const disciplines = teacherDisciplines.disciplines || [];
-    const lessons = Array.isArray(teacherLessons) ? teacherLessons : [];
-    const teacherLessonsResponse = await api.getLessonsByTeacher(userInfo.teacher_id).catch(() => ({ lessons: [] }));
-    const lessons = teacherLessonsResponse.lessons || [];
+    const lessons = teacherLessonsResponse?.lessons || [];
     const departmentName = teacherGroups.department_name || userInfo.teacher_department_name || 'Не указана';
     
     content.innerHTML = `
